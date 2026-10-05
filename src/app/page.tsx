@@ -10,9 +10,8 @@ import {
   Search,
   ShoppingBag,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  DEMO_SALES,
   filterSales,
   getDashboardSummary,
   getSalesTrend,
@@ -48,6 +47,12 @@ const statusStyles: Record<SaleStatus, string> = {
   processing: "bg-amber-50 text-amber-700 ring-amber-600/15",
   cancelled: "bg-rose-50 text-rose-700 ring-rose-600/15",
 };
+
+type SalesSource = "demo" | "postgres";
+type SalesLoadState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "success"; sales: Sale[]; source: SalesSource };
 
 function formatCurrency(value: number) {
   return currency.format(value);
@@ -299,18 +304,88 @@ function TransactionTable({
 }
 
 export default function Home() {
+  const [salesState, setSalesState] = useState<SalesLoadState>({ status: "loading" });
+  const [requestKey, setRequestKey] = useState(0);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<SaleStatus | "all">("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadSales() {
+      try {
+        const response = await fetch("/api/sales", { signal: controller.signal });
+        const payload: unknown = await response.json();
+        if (controller.signal.aborted) return;
+
+        if (!response.ok) {
+          const message =
+            typeof payload === "object" && payload !== null && "error" in payload &&
+            typeof payload.error === "string" && payload.error.trim().length > 0
+              ? payload.error
+              : "Data penjualan tidak dapat dimuat. Silakan coba lagi.";
+          setSalesState({ status: "error", message });
+          return;
+        }
+
+        if (
+          typeof payload !== "object" ||
+          payload === null ||
+          !("sales" in payload) ||
+          !Array.isArray(payload.sales) ||
+          !("source" in payload) ||
+          (payload.source !== "demo" && payload.source !== "postgres")
+        ) {
+          throw new Error("Invalid sales response");
+        }
+
+        setSalesState({
+          status: "success",
+          sales: payload.sales as Sale[],
+          source: payload.source,
+        });
+      } catch {
+        if (controller.signal.aborted) return;
+        setSalesState({
+          status: "error",
+          message: "Data penjualan tidak dapat dimuat. Silakan coba lagi.",
+        });
+      }
+    }
+
+    void loadSales();
+    return () => controller.abort();
+  }, [requestKey]);
+
+  const sales = useMemo(
+    () => (salesState.status === "success" ? salesState.sales : []),
+    [salesState],
+  );
+  const source = salesState.status === "success" ? salesState.source : null;
+  const isLoading = salesState.status === "loading";
+  const loadError = salesState.status === "error" ? salesState.message : null;
+
   const filteredSales = useMemo(
-    () => filterSales(DEMO_SALES, { query, status, from, to }),
-    [query, status, from, to],
+    () => filterSales(sales, { query, status, from, to }),
+    [sales, query, status, from, to],
   );
   const summary = useMemo(() => getDashboardSummary(filteredSales), [filteredSales]);
   const hasFilters = Boolean(query.trim() || from || to || status !== "all");
   const invalidDateRange = Boolean(from && to && from > to);
+  const dataDateRange = useMemo(() => {
+    if (sales.length === 0) return null;
+    const dates = sales.map((sale) => sale.date).sort();
+    return { from: dates[0], to: dates[dates.length - 1] };
+  }, [sales]);
+  const sourceLabel = isLoading
+    ? "Memuat data"
+    : source === "demo"
+      ? "Data contoh"
+      : source === "postgres"
+        ? "PostgreSQL"
+        : "Sumber tidak tersedia";
 
   function resetFilters() {
     setQuery("");
@@ -336,7 +411,7 @@ export default function Home() {
           </div>
           <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-100 bg-blue-50/70 px-3 py-1.5 text-xs font-medium text-blue-800">
             <span className="size-1.5 rounded-full bg-blue-500" aria-hidden="true" />
-            Data contoh
+            {sourceLabel}
           </span>
         </div>
       </header>
@@ -351,12 +426,18 @@ export default function Home() {
               Ringkasan penjualan
             </h1>
             <p className="mt-1.5 max-w-2xl text-sm text-slate-500">
-              Pantau transaksi dan omzet dari data contoh. Semua angka mengikuti filter di bawah.
+              Pantau transaksi dan omzet dari data yang terhubung. Semua angka mengikuti filter di bawah.
             </p>
           </div>
           <span className="inline-flex items-center gap-2 pb-0.5 text-xs text-slate-500">
             <CalendarDays size={15} aria-hidden="true" />
-            Rentang seluruh data demo: 5 Sep – 5 Okt 2026
+            {dataDateRange
+              ? `Rentang seluruh data: ${formatDate(dataDateRange.from)} – ${formatDate(dataDateRange.to)}`
+              : isLoading
+                ? "Memuat rentang data…"
+                : loadError
+                  ? "Rentang data tidak tersedia"
+                  : "Belum ada data transaksi"}
           </span>
         </div>
 
@@ -442,45 +523,74 @@ export default function Home() {
           )}
         </section>
 
-        <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Metrik penjualan">
-          <MetricCard
-            title="Omzet non-dibatalkan"
-            value={formatCurrency(summary.totalRevenue)}
-            description="Nilai transaksi hasil filter, tanpa dibatalkan"
-            icon={<CircleDollarSign size={20} aria-hidden="true" />}
-          />
-          <MetricCard
-            title="Jumlah transaksi"
-            value={summary.transactionCount.toLocaleString("id-ID")}
-            description="Seluruh transaksi hasil filter"
-            icon={<ClipboardList size={20} aria-hidden="true" />}
-          />
-          <MetricCard
-            title="Rata-rata pesanan aktif"
-            value={formatCurrency(summary.averageOrderValue)}
-            description="Omzet non-dibatalkan ÷ pesanan aktif"
-            icon={<ShoppingBag size={20} aria-hidden="true" />}
-          />
-          <MetricCard
-            title="Tingkat penyelesaian"
-            value={new Intl.NumberFormat("id-ID", { style: "percent", maximumFractionDigits: 0 }).format(summary.completionRate)}
-            description={`${summary.completedCount} selesai dari ${summary.activeTransactionCount} pesanan aktif`}
-            icon={<CheckCircle2 size={20} aria-hidden="true" />}
-          />
-        </section>
+        {isLoading ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-5 rounded-xl border border-slate-200/80 bg-white px-4 py-10 text-center text-sm text-slate-500"
+          >
+            Memuat data penjualan…
+          </div>
+        ) : loadError ? (
+          <div
+            role="alert"
+            className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-800"
+          >
+            <p>{loadError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setSalesState({ status: "loading" });
+                setRequestKey((key) => key + 1);
+              }}
+              className="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100"
+            >
+              Coba lagi
+            </button>
+          </div>
+        ) : (
+          <>
+            <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Metrik penjualan">
+              <MetricCard
+                title="Omzet non-dibatalkan"
+                value={formatCurrency(summary.totalRevenue)}
+                description="Nilai transaksi hasil filter, tanpa dibatalkan"
+                icon={<CircleDollarSign size={20} aria-hidden="true" />}
+              />
+              <MetricCard
+                title="Jumlah transaksi"
+                value={summary.transactionCount.toLocaleString("id-ID")}
+                description="Seluruh transaksi hasil filter"
+                icon={<ClipboardList size={20} aria-hidden="true" />}
+              />
+              <MetricCard
+                title="Rata-rata pesanan aktif"
+                value={formatCurrency(summary.averageOrderValue)}
+                description="Omzet non-dibatalkan ÷ pesanan aktif"
+                icon={<ShoppingBag size={20} aria-hidden="true" />}
+              />
+              <MetricCard
+                title="Tingkat penyelesaian"
+                value={new Intl.NumberFormat("id-ID", { style: "percent", maximumFractionDigits: 0 }).format(summary.completionRate)}
+                description={`${summary.completedCount} selesai dari ${summary.activeTransactionCount} pesanan aktif`}
+                icon={<CheckCircle2 size={20} aria-hidden="true" />}
+              />
+            </section>
 
-        <div className="mb-5">
-          <SalesChart sales={filteredSales} />
-        </div>
+            <div className="mb-5">
+              <SalesChart sales={filteredSales} />
+            </div>
 
-        <TransactionTable
-          sales={filteredSales}
-          onReset={resetFilters}
-          hasFilters={hasFilters}
-        />
+            <TransactionTable
+              sales={filteredSales}
+              onReset={resetFilters}
+              hasFilters={hasFilters}
+            />
+          </>
+        )}
 
         <footer className="mt-5 text-center text-xs text-slate-400">
-          Dashboard demo Axon Sales · Nilai dalam Rupiah (IDR)
+          Dashboard Axon Sales · Nilai dalam Rupiah (IDR)
         </footer>
       </main>
     </div>
