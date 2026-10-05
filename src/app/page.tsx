@@ -121,7 +121,7 @@ function SalesChart({ sales }: { sales: readonly Sale[] }) {
             Tren penjualan
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Omzet pesanan selesai dan diproses per tanggal
+            Nilai transaksi hasil filter, tanpa dibatalkan, per tanggal
           </p>
         </div>
         <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-500">
@@ -223,7 +223,7 @@ function TransactionTable({
         </div>
         <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
           <ClipboardList size={15} aria-hidden="true" />
-          Termasuk seluruh status
+          Daftar sesuai filter
         </span>
       </div>
 
@@ -356,7 +356,7 @@ export default function Home() {
           </div>
           <span className="inline-flex items-center gap-2 pb-0.5 text-xs text-slate-500">
             <CalendarDays size={15} aria-hidden="true" />
-            Periode data: 5 Sep – 5 Okt 2026
+            Rentang seluruh data demo: 5 Sep – 5 Okt 2026
           </span>
         </div>
 
@@ -446,13 +446,13 @@ export default function Home() {
           <MetricCard
             title="Omzet non-dibatalkan"
             value={formatCurrency(summary.totalRevenue)}
-            description="Jumlah pesanan selesai dan diproses"
+            description="Nilai transaksi hasil filter, tanpa dibatalkan"
             icon={<CircleDollarSign size={20} aria-hidden="true" />}
           />
           <MetricCard
             title="Jumlah transaksi"
             value={summary.transactionCount.toLocaleString("id-ID")}
-            description="Semua status, termasuk dibatalkan"
+            description="Seluruh transaksi hasil filter"
             icon={<ClipboardList size={20} aria-hidden="true" />}
           />
           <MetricCard
