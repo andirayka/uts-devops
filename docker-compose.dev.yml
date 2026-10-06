@@ -30,7 +30,7 @@ services:
       - .env
     environment:
       NODE_ENV: development
-      PORT: ${PORT:-3000}
+      PORT: 3000
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: ${DB_USER:-root}
