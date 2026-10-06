@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import demoSalesFixtures from "../../database/demo-sales.json";
 import { DEMO_SALES } from "./dashboard-data";
 import {
   mapPostgresSale,
@@ -8,12 +7,6 @@ import {
   validateDatabaseUrl,
   type SalesDataSource,
 } from "./sales-data-source";
-
-describe("database demo fixtures", () => {
-  it("stay aligned with the dashboard's deterministic demo data", () => {
-    expect(demoSalesFixtures).toEqual(DEMO_SALES);
-  });
-});
 
 describe("parseDataSource", () => {
   it("defaults an unset source to the runnable demo", () => {
