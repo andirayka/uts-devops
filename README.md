@@ -1,75 +1,92 @@
-# Axon Sales
+# Axon Sales Dashboard
 
-Dashboard penjualan satu halaman dengan backend Next.js. Filter berlaku serentak ke KPI, grafik, dan tabel. Aplikasi dapat dijalankan dengan data demo atau membaca PostgreSQL milik developer.
+Dashboard penjualan interaktif berbasis **Next.js 16** dan database **MySQL (`classicmodels`)**, dilengkapi dengan containerization Docker (Development & Production) serta pipeline CI/CD otomatis ke server VPS via GitHub Actions.
 
-## Menjalankan mode demo
+---
 
-Prasyarat: Node.js 20.9+ dan npm.
+## 1. Persyaratan Sistem
+- **Docker** dan **Docker Compose** (v2+)
+- **Node.js 24+** dan **npm** (opsional untuk run/test di host lokal)
 
+---
+
+## 2. Menjalankan di Lingkungan Development
+
+Mode development menggunakan [Dockerfile.dev](Dockerfile.dev) dan [docker-compose.dev.yml](docker-compose.dev.yml). Mode ini mendukung *hot-reloading* kode lokal dan otomatis menginisialisasi database saat container pertama kali dinyalakan.
+
+### Langkah-langkah:
+1. Pastikan file `.env` sudah ada (dapat disalin dari `.env.example`):
+   ```bash
+   cp .env.example .env
+   ```
+2. Jalankan Docker Compose Dev:
+   ```bash
+   docker compose -f docker-compose.dev.yml up --build -d
+   ```
+3. Akses dashboard di browser:
+   👉 **`http://localhost:3000`**
+
+> **Catatan Inisialisasi DB di Dev:**
+> Service `app` akan otomatis mengeksekusi `scripts/init-db.mjs` begitu container MySQL berstatus *healthy*. Script ini bersifat *idempotent* (hanya meng-import dump SQL jika tabel belum ada).
+
+Untuk mematikan container:
 ```bash
-npm ci
-cp .env.example .env.local
-npm run dev
+docker compose -f docker-compose.dev.yml down
 ```
 
-Buka `http://localhost:3000`. Nilai bawaan `DATA_SOURCE=demo` tidak membutuhkan database. API yang digunakan halaman:
+---
 
-- `GET /api/sales` → `{ "sales": Sale[], "source": "demo" | "postgres" }`.
-- `GET /api/health` → readiness aplikasi dan sumber data; status HTTP `503` berarti konfigurasi/database PostgreSQL belum siap.
+## 3. Menjalankan di Lingkungan Production
 
-## Menggunakan PostgreSQL
+Mode production menggunakan [Dockerfile.prod](Dockerfile.prod) (multi-stage build dengan user non-root `nextjs` UID 1001 untuk standar DevSecOps) dan [docker-compose.prod.yml](docker-compose.prod.yml).
 
-Siapkan database PostgreSQL milik Anda, lalu edit `.env.local`:
+### Langkah-langkah:
+1. Jalankan Docker Compose Prod:
+   ```bash
+   docker compose -f docker-compose.prod.yml up --build -d
+   ```
+2. **Inisialisasi Database (Manual 1x Saat Pertama Kali Deploy)**:
+   Di mode production, database tidak diinisialisasi otomatis untuk menghindari modifikasi data tanpa sengaja. Jalankan perintah berikut untuk mengisi database pertama kali:
+   ```bash
+   docker compose -f docker-compose.prod.yml exec app npm run db:init
+   ```
+3. Akses aplikasi di port host yang dikonfigurasi di `.env` (misal port `3126`):
+   👉 **`http://localhost:3126`**
 
-```dotenv
-DATA_SOURCE=postgres
-DATABASE_URL=postgresql://<user>:<password>@<host>:5432/<database>
+Untuk mematikan:
+```bash
+docker compose -f docker-compose.prod.yml down
 ```
 
-**Jangan** commit `.env.local` atau mengirim `DATABASE_URL` ke browser. File `.env*` diabaikan Git; `.env.example` aman untuk dibagikan.
+---
 
-Jalankan skema dan seed demo:
+## 4. CI/CD & Otomatisasi Deploy ke VPS (GitHub Actions)
 
-```bash
-npm run db:setup
-npm run dev
-```
+Alur deployment dikonfigurasi di [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
 
-`db:setup` menjalankan `database/schema.sql` dan meng-upsert 20 fixture dari `database/demo-sales.json` berdasarkan ID. Perintah dapat diulang: baris fixture diperbarui bila berubah, sedangkan baris lain tidak dihapus. Gunakan database development/disposable saat menguji seed.
+### Alur Kerja (Workflow):
+1. **Continuous Integration (CI)**: Otomatis berjalan setiap kali ada `git push` ke branch `main`. Menjalankan:
+   - `npm run lint` (ESLint)
+   - `npm run typecheck` (TypeScript check)
+   - `npm test` (Unit test)
+2. **Continuous Deployment (CD)**: Berjalan **secara manual** (*workflow_dispatch*) untuk keamanan rilis. Ketika tombol **"Run workflow"** ditekan di tab Actions GitHub:
+   - GitHub Actions login via SSH ke VPS.
+   - Menjalankan `git pull origin main`.
+   - Menjalankan `docker compose -f docker-compose.prod.yml up --build -d`.
 
-Tabel yang dipakai adalah `public.sales` dengan kolom `id`, `customer`, `product`, `sale_date`, `amount`, `status`, dan `channel`. Status yang diterima: `completed`, `processing`, `cancelled`. `amount` disimpan sebagai whole-IDR `NUMERIC`; API mengirimkannya sebagai bilangan bulat JavaScript. `sale_date` dikirim sebagai ISO `YYYY-MM-DD`.
+### GitHub Secrets yang Dibutuhkan:
+Atur rahasia berikut di menu **Settings → Secrets and variables → Actions**:
+- `VPS_HOST`: IP publik VPS Anda (contoh: `204.44.67.85`)
+- `VPS_USERNAME`: Username login SSH VPS (contoh: `root`)
+- `VPS_SSH_KEY`: Private Key SSH untuk login ke VPS
 
-`DATA_SOURCE` menerima `demo` atau `postgres` (jika tidak diatur, aplikasi memakai `demo`). Bila `postgres` dipilih, aplikasi memerlukan `DATABASE_URL`; kegagalan atau konfigurasi salah menghasilkan error API yang aman dan **tidak** beralih diam-diam ke fixture demo.
+---
 
-Setelah mengubah `DATA_SOURCE` atau `DATABASE_URL`, restart server Next.js agar konfigurasi pool PostgreSQL dibaca ulang.
-
-## Semantik dashboard
-
-- Pencarian berdasarkan ID transaksi, pelanggan, atau produk.
-- Filter tanggal inklusif dan status berlaku ke semua angka, grafik, serta transaksi.
-- Omzet dan grafik menghitung pesanan selesai + diproses, tidak termasuk yang dibatalkan.
-- Jumlah transaksi mencakup semua status. Rata-rata pesanan aktif = omzet non-dibatalkan ÷ pesanan aktif. Tingkat penyelesaian = jumlah selesai ÷ jumlah pesanan aktif.
-
-## Kontrak `Sale`
-
-Tipe bersama berada di `src/lib/dashboard-data.ts`.
-
-| Field | Tipe | Ketentuan |
-| --- | --- | --- |
-| `id` | `string` | ID transaksi unik |
-| `customer` | `string` | Nama pelanggan |
-| `product` | `string` | Nama produk/paket |
-| `date` | `string` | Tanggal ISO `YYYY-MM-DD` |
-| `amount` | `number` | Whole Rupiah/IDR |
-| `status` | `SaleStatus` | `completed`, `processing`, atau `cancelled` |
-| `channel` | `string` | Kanal penjualan |
-
-## Pemeriksaan
+## 5. Pengujian & Linting Lokal
 
 ```bash
-npm test          # filter, KPI/tren, source, mapping API, error aman
-npm run lint      # ESLint
-npm run typecheck # TypeScript
-npm run build     # build produksi
-npm start         # jalankan build produksi
+npm test          # Menjalankan unit test (Vitest)
+npm run lint      # Pemeriksaan linter ESLint
+npm run typecheck # Pemeriksaan tipe data TypeScript
+npm run build     # Uji coba build Next.js standalone
 ```
