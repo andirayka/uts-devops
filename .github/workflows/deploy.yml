@@ -1,0 +1,60 @@
+name: CI & Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Manual
+
+jobs:
+  ci:
+    name: Run Quality & Test Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Linter
+        run: npm run lint
+
+      - name: Run TypeScript Type Check
+        run: npm run typecheck
+
+      - name: Run Unit Tests
+        run: npm test
+
+  deploy:
+    name: Deploy to Production VPS
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            echo "🚀 Entering project directory on VPS..."
+            cd /root/uts-devops
+
+            echo "📥 Pulling latest changes from main branch..."
+            git pull origin main
+
+            echo "🐳 Building and updating production containers..."
+            docker compose -f docker-compose.prod.yml up --build -d
+
+            echo "🎉 Deployment successfully completed!"
