@@ -36,9 +36,19 @@ docker compose -f docker-compose.dev.yml down
 
 ---
 
-## 3. Menjalankan di Lingkungan Production
+## 3. Menjalankan di Lingkungan Production (App + Nginx + Monitoring)
 
-Mode production menggunakan [Dockerfile.prod](Dockerfile.prod) (multi-stage build dengan user non-root `nextjs` UID 1001 untuk standar DevSecOps) dan [docker-compose.prod.yml](docker-compose.prod.yml).
+Mode production menggunakan [docker-compose.prod.yml](docker-compose.prod.yml) dengan arsitektur **Single Entrypoint** via **Nginx Reverse Proxy**. Semua layanan (Next.js, MySQL, Prometheus, Grafana, dan MySQL Exporter) terintegrasi dalam 1 file compose:
+
+- **Nginx Reverse Proxy**: Mengatur lalu lintas pada 1 port publik (`${PORT}`, default `3126`).
+- **Next.js App**: Berjalan di container terisolasi ([Dockerfile.prod](Dockerfile.prod), non-root user `nextjs` UID 1001).
+- **Database MySQL**: Database relasional dengan skema `classicmodels`.
+- **mysqld-exporter**: Mengekspos metrik performa MySQL internal (`:9104`).
+- **Node Exporter**: Memantau kesehatan OS/host VPS (CPU, RAM, Disk, Load) via socket host (`:9100`).
+- **cAdvisor**: Memantau konsumsi resource per-container Docker secara real-time (`:8080`).
+- **Prometheus**: Mengumpulkan metrik secara internal dari semua exporter. Port 9090 terisolasi di jaringan internal Docker demi keamanan.
+- **Grafana**: Visualisasi metrik terintegrasi langsung via subpath `/grafana/` dengan dashboard auto-provisioned.
+
 
 ### Langkah-langkah:
 1. Jalankan Docker Compose Prod:
@@ -48,15 +58,21 @@ Mode production menggunakan [Dockerfile.prod](Dockerfile.prod) (multi-stage buil
 2. **Inisialisasi Database (Manual 1x Saat Pertama Kali Deploy)**:
    Di mode production, database tidak diinisialisasi otomatis untuk menghindari modifikasi data tanpa sengaja. Jalankan perintah berikut untuk mengisi database pertama kali:
    ```bash
-   docker compose -f docker-compose.prod.yml exec app npm run db:init
+   docker compose -f docker-compose.prod.yml exec -T mysql mysql -uroot -p${DB_PASSWORD} classicmodels < database/init.sql
    ```
-3. Akses aplikasi di port host yang dikonfigurasi di `.env` (misal port `3126`):
-   👉 **`http://localhost:3126`**
+3. **Akses Layanan (Semua Lewat Port 3126)**:
+   - 👉 **Web Dashboard**: `http://localhost:3126/` (atau `http://axon-kelompok-1.my.id/`)
+   - 👉 **Grafana Monitoring**: `http://localhost:3126/grafana/`
+     - Default login: user `admin`, password `admin`
+     - Dashboard siap pakai: **`Axon Sales Dashboard - System & HTTP Monitoring`** (bisa dibuka langsung di `http://localhost:3126/grafana/d/axon-sales-monitoring`)
+     - Datasource Prometheus & panel otomatis terpasang tanpa setup manual.
+
 
 Untuk mematikan:
 ```bash
 docker compose -f docker-compose.prod.yml down
 ```
+
 
 ---
 
