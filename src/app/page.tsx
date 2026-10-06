@@ -13,17 +13,16 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   filterSales,
+  formatSaleAmount,
+  formatSalesAxisTick,
   getDashboardSummary,
+  getSalesAxisMaximum,
+  getSalesSourcePresentation,
   getSalesTrend,
   type Sale,
   type SaleStatus,
+  type SalesSource,
 } from "@/lib/dashboard-data";
-
-const currency = new Intl.NumberFormat("id-ID", {
-  style: "currency",
-  currency: "IDR",
-  maximumFractionDigits: 0,
-});
 
 const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   day: "2-digit",
@@ -48,15 +47,10 @@ const statusStyles: Record<SaleStatus, string> = {
   cancelled: "bg-rose-50 text-rose-700 ring-rose-600/15",
 };
 
-type SalesSource = "demo" | "postgres";
 type SalesLoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "success"; sales: Sale[]; source: SalesSource };
-
-function formatCurrency(value: number) {
-  return currency.format(value);
-}
 
 function formatDate(value: string, short = false) {
   const date = new Date(`${value}T00:00:00`);
@@ -103,16 +97,25 @@ function StatusPill({ status }: { status: SaleStatus }) {
   );
 }
 
-function SalesChart({ sales }: { sales: readonly Sale[] }) {
+function SalesChart({
+  sales,
+  source,
+}: {
+  sales: readonly Sale[];
+  source: SalesSource;
+}) {
   const trend = useMemo(() => getSalesTrend(sales), [sales]);
   const maximumRevenue = Math.max(...trend.map((point) => point.revenue), 0);
-  const axisMaximum = Math.max(
-    Math.ceil(maximumRevenue / 1_000_000) * 1_000_000,
-    1_000_000,
-  );
+  const axisMaximum = getSalesAxisMaximum(maximumRevenue, source);
   const axisTicks = [axisMaximum, axisMaximum * (2 / 3), axisMaximum / 3, 0];
+  const presentation = getSalesSourcePresentation(source);
+  const denseTrend = trend.length > 48;
+  const labelInterval = Math.max(1, Math.ceil((trend.length - 1) / 7));
   const visibleLabels = (index: number) =>
-    trend.length <= 8 || index === 0 || index === trend.length - 1 || index % 4 === 0;
+    trend.length <= 8 ||
+    index === 0 ||
+    index === trend.length - 1 ||
+    index % labelInterval === 0;
 
   return (
     <section
@@ -130,7 +133,7 @@ function SalesChart({ sales }: { sales: readonly Sale[] }) {
           </p>
         </div>
         <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-500">
-          Nilai dalam rupiah
+          {presentation.amountUnitLabel}
         </span>
       </div>
 
@@ -151,20 +154,16 @@ function SalesChart({ sales }: { sales: readonly Sale[] }) {
       ) : (
         <div className="mt-6 overflow-x-auto pb-1">
           <div className="min-w-[560px]">
-            <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3">
+            <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3">
               <div className="flex h-48 flex-col justify-between pb-1 text-right text-[10px] tabular-nums text-slate-400">
                 {axisTicks.map((tick, index) => (
                   <span key={`${tick}-${index}`}>
-                    {tick === 0
-                      ? "0"
-                      : `${new Intl.NumberFormat("id-ID", {
-                          maximumFractionDigits: 1,
-                        }).format(tick / 1_000_000)} jt`}
+                    {tick === 0 ? "0" : formatSalesAxisTick(tick, source)}
                   </span>
                 ))}
               </div>
               <div className="relative h-48 border-b border-l border-slate-200 bg-[linear-gradient(to_bottom,#e8edf4_1px,transparent_1px)] [background-size:100%_33.333%]">
-                <div className="absolute inset-0 flex items-stretch justify-between gap-1.5 px-2 sm:gap-2">
+                <div className={`absolute inset-0 flex items-stretch justify-between px-2 ${denseTrend ? "gap-0" : "gap-1.5 sm:gap-2"}`}>
                   {trend.map((point) => {
                     const height = (point.revenue / axisMaximum) * 100;
                     const formattedDate = formatDate(point.date);
@@ -176,8 +175,8 @@ function SalesChart({ sales }: { sales: readonly Sale[] }) {
                         <div
                           className="w-full max-w-8 rounded-t-[4px] bg-blue-600 transition-colors group-hover:bg-blue-700"
                           style={{ height: `${height}%` }}
-                          title={`${formattedDate}: ${formatCurrency(point.revenue)} · ${point.transactions} pesanan aktif`}
-                          aria-label={`${formattedDate}: ${formatCurrency(point.revenue)}`}
+                          title={`${formattedDate}: ${formatSaleAmount(point.revenue, source)} · ${point.transactions} pesanan aktif`}
+                          aria-label={`${formattedDate}: ${formatSaleAmount(point.revenue, source)}`}
                         />
                       </div>
                     );
@@ -185,14 +184,30 @@ function SalesChart({ sales }: { sales: readonly Sale[] }) {
                 </div>
               </div>
             </div>
-            <div className="mt-2 grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3">
+            <div className="mt-2 grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3">
               <span aria-hidden="true" />
-              <div className="flex justify-between gap-1 px-2 text-[10px] text-slate-400">
-                {trend.map((point, index) => (
-                  <span key={point.date} className="min-w-0 flex-1 text-center">
-                    {visibleLabels(index) ? formatDate(point.date, true) : ""}
-                  </span>
-                ))}
+              <div className="relative h-5 text-[10px] text-slate-400">
+                <div className="absolute inset-x-2 top-0">
+                  {trend.map((point, index) => (
+                    visibleLabels(index) ? (
+                      <span
+                        key={point.date}
+                        className="absolute top-0 whitespace-nowrap"
+                        style={{
+                          left: `${trend.length === 1 ? 50 : (index / (trend.length - 1)) * 100}%`,
+                          transform:
+                            trend.length === 1 || (index !== 0 && index !== trend.length - 1)
+                              ? "translateX(-50%)"
+                              : index === 0
+                                ? "translateX(0)"
+                                : "translateX(-100%)",
+                        }}
+                      >
+                        {formatDate(point.date, true)}
+                      </span>
+                    ) : null
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -204,13 +219,17 @@ function SalesChart({ sales }: { sales: readonly Sale[] }) {
 
 function TransactionTable({
   sales,
+  source,
   onReset,
   hasFilters,
 }: {
   sales: readonly Sale[];
+  source: SalesSource;
   onReset: () => void;
   hasFilters: boolean;
 }) {
+  const presentation = getSalesSourcePresentation(source);
+
   return (
     <section
       id="transaksi"
@@ -257,16 +276,16 @@ function TransactionTable({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[980px] table-fixed text-left text-sm">
             <thead className="bg-slate-50/80 text-[11px] uppercase tracking-[0.06em] text-slate-500">
               <tr>
-                <th scope="col" className="px-5 py-3 font-semibold">ID transaksi</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Tanggal</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Pelanggan</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Produk</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Kanal</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Status</th>
-                <th scope="col" className="px-5 py-3 text-right font-semibold">Total</th>
+                <th scope="col" className="w-32 px-5 py-3 font-semibold">ID transaksi</th>
+                <th scope="col" className="w-36 px-4 py-3 font-semibold">Tanggal</th>
+                <th scope="col" className="w-56 px-4 py-3 font-semibold">Pelanggan</th>
+                <th scope="col" className="w-[22%] px-4 py-3 font-semibold">Produk</th>
+                <th scope="col" className="w-36 px-4 py-3 font-semibold">{presentation.locationLabel}</th>
+                <th scope="col" className="w-32 px-4 py-3 font-semibold">Status</th>
+                <th scope="col" className="w-40 px-5 py-3 text-right font-semibold">{presentation.tableAmountLabel}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -276,13 +295,15 @@ function TransactionTable({
                     {sale.id}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
-                    {formatDate(sale.date)}
+                    <time dateTime={sale.date}>{formatDate(sale.date)}</time>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3.5 font-medium text-slate-800">
+                  <td className="truncate whitespace-nowrap px-4 py-3.5 font-medium text-slate-800">
                     {sale.customer}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
-                    {sale.product}
+                  <td className="px-4 py-3.5 text-slate-600">
+                    <span className="block truncate" title={sale.product}>
+                      {sale.product}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
                     {sale.channel}
@@ -291,7 +312,7 @@ function TransactionTable({
                     <StatusPill status={sale.status} />
                   </td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-right font-semibold tabular-nums text-slate-800">
-                    {formatCurrency(sale.amount)}
+                    {formatSaleAmount(sale.amount, source)}
                   </td>
                 </tr>
               ))}
@@ -336,7 +357,7 @@ export default function Home() {
           !("sales" in payload) ||
           !Array.isArray(payload.sales) ||
           !("source" in payload) ||
-          (payload.source !== "demo" && payload.source !== "postgres")
+          (payload.source !== "demo" && payload.source !== "mysql")
         ) {
           throw new Error("Invalid sales response");
         }
@@ -364,6 +385,7 @@ export default function Home() {
     [salesState],
   );
   const source = salesState.status === "success" ? salesState.source : null;
+  const presentation = source ? getSalesSourcePresentation(source) : null;
   const isLoading = salesState.status === "loading";
   const loadError = salesState.status === "error" ? salesState.message : null;
 
@@ -381,11 +403,7 @@ export default function Home() {
   }, [sales]);
   const sourceLabel = isLoading
     ? "Memuat data"
-    : source === "demo"
-      ? "Data contoh"
-      : source === "postgres"
-        ? "PostgreSQL"
-        : "Sumber tidak tersedia";
+    : presentation?.label ?? "Sumber tidak tersedia";
 
   function resetFilters() {
     setQuery("");
@@ -426,7 +444,7 @@ export default function Home() {
               Ringkasan penjualan
             </h1>
             <p className="mt-1.5 max-w-2xl text-sm text-slate-500">
-              Pantau transaksi dan omzet dari data yang terhubung. Semua angka mengikuti filter di bawah.
+              Pantau transaksi dan nilai dari data yang terhubung. Semua angka mengikuti filter di bawah.
             </p>
           </div>
           <span className="inline-flex items-center gap-2 pb-0.5 text-xs text-slate-500">
@@ -552,8 +570,8 @@ export default function Home() {
           <>
             <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Metrik penjualan">
               <MetricCard
-                title="Omzet non-dibatalkan"
-                value={formatCurrency(summary.totalRevenue)}
+                title={presentation?.revenueMetricTitle ?? "Nilai transaksi aktif"}
+                value={formatSaleAmount(summary.totalRevenue, source ?? "demo")}
                 description="Nilai transaksi hasil filter, tanpa dibatalkan"
                 icon={<CircleDollarSign size={20} aria-hidden="true" />}
               />
@@ -564,9 +582,9 @@ export default function Home() {
                 icon={<ClipboardList size={20} aria-hidden="true" />}
               />
               <MetricCard
-                title="Rata-rata pesanan aktif"
-                value={formatCurrency(summary.averageOrderValue)}
-                description="Omzet non-dibatalkan ÷ pesanan aktif"
+                title={presentation?.averageMetricTitle ?? "Rata-rata nilai aktif"}
+                value={formatSaleAmount(summary.averageOrderValue, source ?? "demo")}
+                description="Nilai transaksi aktif ÷ pesanan aktif"
                 icon={<ShoppingBag size={20} aria-hidden="true" />}
               />
               <MetricCard
@@ -578,11 +596,12 @@ export default function Home() {
             </section>
 
             <div className="mb-5">
-              <SalesChart sales={filteredSales} />
+              <SalesChart sales={filteredSales} source={source ?? "demo"} />
             </div>
 
             <TransactionTable
               sales={filteredSales}
+              source={source ?? "demo"}
               onReset={resetFilters}
               hasFilters={hasFilters}
             />
@@ -590,7 +609,7 @@ export default function Home() {
         )}
 
         <footer className="mt-5 text-center text-xs text-slate-400">
-          Dashboard Axon Sales · Nilai dalam Rupiah (IDR)
+          {presentation?.footerLabel ?? "Dashboard Axon Sales"}
         </footer>
       </main>
     </div>

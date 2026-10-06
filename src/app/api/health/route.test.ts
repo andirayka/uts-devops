@@ -33,7 +33,7 @@ describe("GET /api/health", () => {
   it("returns 503 readiness without exposing a database error", async () => {
     mockGetReadiness.mockResolvedValue({
       ready: false,
-      source: "postgres",
+      source: "mysql",
       database: "unavailable",
     });
 
@@ -43,16 +43,16 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(503);
     expect(body).toEqual({
       ready: false,
-      source: "postgres",
+      source: "mysql",
       database: "unavailable",
     });
     expect(JSON.stringify(body)).not.toContain("127.0.0.1");
   });
 
-  it("reports missing PostgreSQL configuration separately from an unavailable server", async () => {
+  it("reports missing MySQL configuration separately from an unavailable server", async () => {
     mockGetReadiness.mockResolvedValue({
       ready: false,
-      source: "postgres",
+      source: "mysql",
       database: "misconfigured",
     });
 
@@ -61,7 +61,7 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
       ready: false,
-      source: "postgres",
+      source: "mysql",
       database: "misconfigured",
     });
   });

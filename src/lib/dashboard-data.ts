@@ -1,4 +1,15 @@
 export type SaleStatus = "completed" | "processing" | "cancelled";
+export type SalesSource = "demo" | "mysql";
+
+export type SalesSourcePresentation = {
+  label: string;
+  locationLabel: string;
+  amountUnitLabel: string;
+  tableAmountLabel: string;
+  revenueMetricTitle: string;
+  averageMetricTitle: string;
+  footerLabel: string;
+};
 
 export type Sale = {
   id: string;
@@ -283,4 +294,87 @@ export function getSalesTrend(
   return [...dailyTotals.values()].sort((left, right) =>
     left.date.localeCompare(right.date),
   );
+}
+
+export function getSalesSourcePresentation(
+  source: SalesSource,
+): SalesSourcePresentation {
+  if (source === "demo") {
+    return {
+      label: "Data contoh",
+      locationLabel: "Kanal",
+      amountUnitLabel: "Nilai dalam rupiah",
+      tableAmountLabel: "Total",
+      revenueMetricTitle: "Omzet non-dibatalkan",
+      averageMetricTitle: "Rata-rata pesanan aktif",
+      footerLabel: "Dashboard Axon Sales · Nilai dalam Rupiah (IDR)",
+    };
+  }
+
+  return {
+    label: "MySQL · Data dosen",
+    locationLabel: "Negara pelanggan",
+    amountUnitLabel: "Nilai dataset · desimal",
+    tableAmountLabel: "Nilai",
+    revenueMetricTitle: "Nilai transaksi aktif",
+    averageMetricTitle: "Rata-rata nilai aktif",
+    footerLabel: "Dashboard Axon Sales · Nilai dataset tanpa satuan mata uang",
+  };
+}
+
+export function formatSaleAmount(amount: number, source: SalesSource): string {
+  if (source === "demo") {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+
+  return new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function formatSalesAxisTick(
+  value: number,
+  source: SalesSource,
+): string {
+  if (source === "demo") {
+    return `${new Intl.NumberFormat("id-ID", {
+      maximumFractionDigits: 1,
+    }).format(value / 1_000_000)} jt`;
+  }
+
+  return new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+export function getSalesAxisMaximum(
+  maximumRevenue: number,
+  source: SalesSource,
+): number {
+  if (source === "demo") {
+    return Math.max(
+      Math.ceil(maximumRevenue / 1_000_000) * 1_000_000,
+      1_000_000,
+    );
+  }
+
+  const safeMaximum = Math.max(maximumRevenue, 0);
+  const magnitude = 10 ** Math.floor(Math.log10(safeMaximum || 1));
+  const normalizedMaximum = safeMaximum / magnitude;
+  const step =
+    normalizedMaximum <= 1
+      ? 1
+      : normalizedMaximum <= 2
+        ? 2
+        : normalizedMaximum <= 5
+          ? 5
+          : 10;
+
+  return step * magnitude;
 }

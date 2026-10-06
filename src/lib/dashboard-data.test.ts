@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSales,
+  formatSaleAmount,
+  formatSalesAxisTick,
+  getSalesAxisMaximum,
+  getSalesSourcePresentation,
   getDashboardSummary,
   getSalesTrend,
   type Sale,
@@ -46,6 +50,15 @@ const sales: Sale[] = [
 ];
 
 describe("filterSales", () => {
+  it("keeps the full historical dataset when no date range is selected", () => {
+    expect(filterSales(sales).map(({ id }) => id)).toEqual([
+      "AX-1004",
+      "AX-1002",
+      "AX-1003",
+      "AX-1001",
+    ]);
+  });
+
   it("combines search, inclusive dates, and status instead of applying only one filter", () => {
     expect(
       filterSales(sales, {
@@ -83,6 +96,32 @@ describe("filterSales", () => {
   });
 });
 
+describe("dashboard source presentation", () => {
+  it("identifies the lecturer MySQL dataset and its country and neutral value fields", () => {
+    expect(getSalesSourcePresentation("mysql")).toEqual({
+      label: "MySQL · Data dosen",
+      locationLabel: "Negara pelanggan",
+      amountUnitLabel: "Nilai dataset · desimal",
+      tableAmountLabel: "Nilai",
+      revenueMetricTitle: "Nilai transaksi aktif",
+      averageMetricTitle: "Rata-rata nilai aktif",
+      footerLabel: "Dashboard Axon Sales · Nilai dataset tanpa satuan mata uang",
+    });
+  });
+
+  it("formats MySQL amounts as decimals without assuming a currency and keeps demo in IDR", () => {
+    expect(formatSaleAmount(12_345.6, "mysql")).toBe("12.345,60");
+    expect(formatSaleAmount(1_250_000, "demo")).toBe("Rp\u00a01.250.000");
+  });
+
+  it("uses neutral decimal chart ticks for MySQL and rupiah-scaled ticks for demo", () => {
+    expect(formatSalesAxisTick(12_345.6, "mysql")).toBe("12.345,60");
+    expect(formatSalesAxisTick(1_250_000, "demo")).toBe("1,3 jt");
+    expect(getSalesAxisMaximum(12_345.6, "mysql")).toBe(20_000);
+    expect(getSalesAxisMaximum(1_250_000, "demo")).toBe(2_000_000);
+  });
+});
+
 describe("getDashboardSummary", () => {
   it("excludes cancelled revenue and derives averages and completion rate from active orders", () => {
     expect(getDashboardSummary(sales)).toEqual({
@@ -103,6 +142,23 @@ describe("getDashboardSummary", () => {
       averageOrderValue: 0,
       completedCount: 0,
       completionRate: 0,
+    });
+  });
+
+  it("keeps fractional order values in revenue and average calculations", () => {
+    expect(
+      getDashboardSummary([
+        { ...sales[0], amount: 12.35 },
+        { ...sales[1], amount: 0.4 },
+        { ...sales[2], amount: 5.99 },
+      ]),
+    ).toEqual({
+      totalRevenue: 12.75,
+      transactionCount: 3,
+      activeTransactionCount: 2,
+      averageOrderValue: 6.375,
+      completedCount: 1,
+      completionRate: 0.5,
     });
   });
 });

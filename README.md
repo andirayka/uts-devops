@@ -106,3 +106,36 @@ npm run lint      # Pemeriksaan linter ESLint
 npm run typecheck # Pemeriksaan tipe data TypeScript
 npm run build     # Uji coba build Next.js standalone
 ```
+
+## 6. Sumber data dan pemetaan MySQL
+
+Di host lokal, `DATA_SOURCE` menerima `demo` atau `mysql` dan default ke `demo`.
+Untuk memakai MySQL, siapkan database `classicmodels` kosong lalu isi
+`.env.local`:
+
+```dotenv
+DATA_SOURCE=mysql
+DATABASE_URL=mysql://axon:<password-url-encoded>@127.0.0.1:3306/classicmodels
+```
+
+Jalankan `npm run db:setup` sebelum `npm run dev`. Script hanya menerima URL
+loopback untuk `/classicmodels` dan menolak database yang sudah memiliki tabel
+atau view. Dump dosen berisi `DROP TABLE IF EXISTS`; gunakan database/volume
+disposable, bukan database bersama. Untuk mengulang impor, buat database kosong
+yang baru.
+
+Di Docker Compose, service aplikasi menggunakan `DATA_SOURCE=mysql` dan
+`DATABASE_URL` menuju service `mysql`; konfigurasi host/user/password/database
+berasal dari variabel `DB_*` di `.env`. Kredensial dengan karakter khusus harus
+di-URL-encode jika disusun sebagai URL koneksi.
+
+Backend membaca satu `Sale` per order dari `orders`, menggabungkan nama produk
+per order, mempertahankan jumlah DECIMAL tanpa `ROUND()`, dan memetakan status
+`Shipped`/`Resolved` ke `completed`, `Cancelled` ke `cancelled`, serta status
+lainnya ke `processing`. `channel` pada data MySQL adalah negara pelanggan,
+bukan kanal penjualan. Nilai dalam dump tidak menyatakan mata uang; UI tidak
+memformatnya sebagai IDR atau USD.
+
+SQL sumber dan hash provenance ada di `database/source/README.md`. Hasil
+verifikasi dump, analisis, dan perbedaan SQL koreksi ada di
+`database/verification/ANALYSIS.md`; SQL asli tidak diubah.

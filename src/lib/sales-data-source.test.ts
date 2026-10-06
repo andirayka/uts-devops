@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEMO_SALES } from "./dashboard-data";
 import {
-  mapPostgresSale,
+  mapMySqlSale,
   parseDataSource,
   readSalesForSource,
   validateDatabaseUrl,
@@ -15,114 +14,134 @@ describe("parseDataSource", () => {
 
   it("accepts the two explicit source modes", () => {
     expect(parseDataSource("demo")).toBe("demo");
-    expect(parseDataSource("postgres")).toBe("postgres");
+    expect(parseDataSource("mysql")).toBe("mysql");
   });
 
   it("rejects unknown modes without echoing their value", () => {
     expect(() => parseDataSource("postgres://user:password@host/db")).toThrow(
-      "DATA_SOURCE must be either demo or postgres",
+      "DATA_SOURCE must be either demo or mysql",
     );
   });
 });
 
 describe("validateDatabaseUrl", () => {
-  it("accepts a PostgreSQL URL without revealing it in errors", () => {
-    const databaseUrl = "postgresql://axon:secret@localhost:5432/axon_sales";
+  it("accepts a MySQL URL without revealing it in errors", () => {
+    const databaseUrl = "mysql://axon:secret@localhost:3306/classicmodels";
     expect(validateDatabaseUrl(databaseUrl)).toBe(databaseUrl);
   });
 
-  it("rejects missing, malformed, and non-PostgreSQL URLs", () => {
+  it("rejects missing, malformed, and non-MySQL URLs", () => {
     expect(() => validateDatabaseUrl(undefined)).toThrow(
-      "DATABASE_URL is required when DATA_SOURCE=postgres",
+      "DATABASE_URL is required when DATA_SOURCE=mysql",
     );
     expect(() => validateDatabaseUrl("not a URL with password=secret")).toThrow(
-      "DATABASE_URL must be a valid PostgreSQL URL",
+      "DATABASE_URL must be a valid MySQL URL for the classicmodels database",
     );
     expect(() => validateDatabaseUrl("https://user:secret@example.test/db")).toThrow(
-      "DATABASE_URL must be a valid PostgreSQL URL",
+      "DATABASE_URL must be a valid MySQL URL for the classicmodels database",
+    );
+    expect(() => validateDatabaseUrl("mysql://user:secret@localhost/other_db")).toThrow(
+      "DATABASE_URL must be a valid MySQL URL for the classicmodels database",
     );
   });
 });
 
-describe("mapPostgresSale", () => {
-  it("maps a whole-IDR numeric value and preserves the ISO date and status", () => {
+describe("mapMySqlSale", () => {
+  it("maps one aggregated classicmodels order without rounding its decimal amount", () => {
     expect(
-      mapPostgresSale({
-        id: "AX-2401",
-        customer: "CV Sinar Nusantara",
-        product: "Starter Kit",
-        date: "2026-10-05",
-        amount: "1250000",
-        status: "completed",
-        channel: "Website",
+      mapMySqlSale({
+        id: "10100",
+        customer: "Online Diecast Creations Co.",
+        product: "1940s Ford truck, 1911 Ford Town Car",
+        date: "2003-01-06",
+        amount: "1250.37",
+        rawStatus: "Shipped",
+        channel: "USA",
       }),
     ).toEqual({
-      id: "AX-2401",
-      customer: "CV Sinar Nusantara",
-      product: "Starter Kit",
-      date: "2026-10-05",
-      amount: 1_250_000,
+      id: "10100",
+      customer: "Online Diecast Creations Co.",
+      product: "1940s Ford truck, 1911 Ford Town Car",
+      date: "2003-01-06",
+      amount: 1250.37,
       status: "completed",
-      channel: "Website",
+      channel: "USA",
     });
   });
 
-  it("rejects fractional, unsafe, and malformed amounts", () => {
-    for (const amount of ["1250000.5", "9007199254740992", "not-a-number"]) {
+  it.each([
+    ["Resolved", "completed"],
+    ["Cancelled", "cancelled"],
+    ["On Hold", "processing"],
+    ["In Process", "processing"],
+  ] as const)("maps source status %s to %s", (rawStatus, status) => {
+    expect(
+      mapMySqlSale({
+        id: "10100",
+        customer: "Online Diecast Creations Co.",
+        product: "Classic car",
+        date: "2003-01-06",
+        amount: "10.25",
+        rawStatus,
+        channel: "USA",
+      }).status,
+    ).toBe(status);
+  });
+
+  it("rejects malformed and unsafe decimal amounts", () => {
+    for (const amount of ["9007199254740992", "not-a-number", "-10.25", "1.25 USD"]) {
       expect(() =>
-        mapPostgresSale({
-          id: "AX-2401",
-          customer: "CV Sinar Nusantara",
-          product: "Starter Kit",
-          date: "2026-10-05",
+        mapMySqlSale({
+          id: "10100",
+          customer: "Online Diecast Creations Co.",
+          product: "Classic car",
+          date: "2003-01-06",
           amount,
-          status: "completed",
-          channel: "Website",
+          rawStatus: "Shipped",
+          channel: "USA",
         }),
-      ).toThrow("Invalid sales row returned by PostgreSQL");
+      ).toThrow("Invalid sales row returned by MySQL");
     }
   });
 
-  it("rejects malformed dates and statuses", () => {
+  it("rejects malformed dates and fields", () => {
     const sale = {
-      id: "AX-2401",
-      customer: "CV Sinar Nusantara",
-      product: "Starter Kit",
+      id: "10100",
+      customer: "Online Diecast Creations Co.",
+      product: "Classic car",
       date: "2026-02-30",
-      amount: "1250000",
-      status: "completed",
-      channel: "Website",
+      amount: "10.25",
+      rawStatus: "Shipped",
+      channel: "USA",
     };
 
-    expect(() => mapPostgresSale(sale)).toThrow(
-      "Invalid sales row returned by PostgreSQL",
-    );
+    expect(() => mapMySqlSale(sale)).toThrow("Invalid sales row returned by MySQL");
     expect(() =>
-      mapPostgresSale({ ...sale, date: "2026-10-05", status: "pending" }),
-    ).toThrow("Invalid sales row returned by PostgreSQL");
+      mapMySqlSale({ ...sale, date: "2003-01-06", customer: "" }),
+    ).toThrow("Invalid sales row returned by MySQL");
   });
 });
 
 describe("readSalesForSource", () => {
   it("reads demo fixtures only when demo mode is selected", async () => {
     const demo = vi.fn(async () => ["demo"]);
-    const postgres = vi.fn(async () => ["database"]);
+    const mysql = vi.fn(async () => ["database"]);
 
     await expect(
-      readSalesForSource("demo", { demo, postgres } satisfies Record<SalesDataSource, () => Promise<string[]>>),
+      readSalesForSource("demo", { demo, mysql } satisfies Record<SalesDataSource, () => Promise<string[]>>),
     ).resolves.toEqual(["demo"]);
     expect(demo).toHaveBeenCalledOnce();
-    expect(postgres).not.toHaveBeenCalled();
+    expect(mysql).not.toHaveBeenCalled();
   });
 
-  it("does not silently fall back to demo when PostgreSQL fails", async () => {
+  it("does not silently fall back to demo when MySQL fails", async () => {
     const demo = vi.fn(async () => ["demo"]);
-    const postgres = vi.fn(async () => {
+    const mysql = vi.fn(async () => {
       throw new Error("database password must not be returned");
     });
 
     await expect(
-      readSalesForSource("postgres", { demo, postgres } satisfies Record<SalesDataSource, () => Promise<string[]>>),
+      readSalesForSource("mysql", { demo, mysql } satisfies Record<SalesDataSource, () => Promise<string[]>>),
     ).rejects.toThrow("database password must not be returned");
     expect(demo).not.toHaveBeenCalled();
   });

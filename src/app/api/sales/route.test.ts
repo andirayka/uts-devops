@@ -42,7 +42,7 @@ describe("GET /api/sales", () => {
     mockGetSalesData.mockRejectedValue(
       new Error("connection failed at 127.0.0.1:55432"),
     );
-    mockGetSalesDataSource.mockReturnValue("postgres");
+    mockGetSalesDataSource.mockReturnValue("mysql");
 
     const response = await GET();
     const body = await response.json();
@@ -50,7 +50,7 @@ describe("GET /api/sales", () => {
     expect(response.status).toBe(503);
     expect(body).toEqual({
       error: "Data penjualan tidak tersedia. Coba lagi.",
-      source: "postgres",
+      source: "mysql",
     });
     expect(JSON.stringify(body)).not.toContain("127.0.0.1");
   });

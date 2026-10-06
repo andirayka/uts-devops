@@ -31,6 +31,8 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
+      DATA_SOURCE: mysql
+      DATABASE_URL: mysql://${DB_USER:-root}:${DB_PASSWORD}@mysql:3306/${DB_NAME:-classicmodels}
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: ${DB_USER:-root}
