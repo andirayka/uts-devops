@@ -217,6 +217,106 @@ function SalesChart({
   );
 }
 
+const PAGE_SIZE_OPTIONS = [10, 15, 20] as const;
+
+function PaginationControls({
+  page,
+  pageSize,
+  totalItems,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startItem = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endItem = Math.min(page * pageSize, totalItems);
+
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const visiblePages = pageNumbers.filter(
+    (n) => n === 1 || n === totalPages || Math.abs(n - page) <= 1,
+  );
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Prev
+        </button>
+        <div className="flex items-center gap-1">
+          {visiblePages.map((n, idx) => {
+            const prev = idx > 0 ? visiblePages[idx - 1] : null;
+            const showGap = prev !== null && n - prev > 1;
+            return (
+              <span key={n} className="flex items-center gap-1">
+                {showGap && (
+                  <span className="px-1 text-xs text-slate-400" aria-hidden="true">
+                    …
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onPageChange(n)}
+                  aria-current={n === page ? "page" : undefined}
+                  className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-medium transition ${
+                    n === page
+                      ? "bg-blue-700 text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  {n}
+                </button>
+              </span>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Next
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-xs tabular-nums text-slate-500">
+          {startItem}–{endItem} dari {totalItems}
+        </span>
+        <label className="flex items-center gap-2 text-xs text-slate-500">
+          Tampilkan
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:border-slate-300 focus:border-blue-500 focus:outline-none"
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function TransactionTable({
   sales,
   source,
@@ -228,7 +328,16 @@ function TransactionTable({
   onReset: () => void;
   hasFilters: boolean;
 }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
   const presentation = getSalesSourcePresentation(source);
+
+  const totalPages = Math.max(1, Math.ceil(sales.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedSales = useMemo(
+    () => sales.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [sales, currentPage, pageSize],
+  );
 
   return (
     <section
@@ -289,7 +398,7 @@ function TransactionTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sales.map((sale) => (
+              {paginatedSales.map((sale) => (
                 <tr key={sale.id} className="transition-colors hover:bg-slate-50/70">
                   <td className="whitespace-nowrap px-5 py-3.5 font-medium text-blue-700">
                     {sale.id}
@@ -319,6 +428,18 @@ function TransactionTable({
             </tbody>
           </table>
         </div>
+      )}
+      {sales.length > 0 && (
+        <PaginationControls
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={sales.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       )}
     </section>
   );
