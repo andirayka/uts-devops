@@ -33,14 +33,18 @@ jobs:
         run: npm test
 
       - name: Run SAST Scan
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/security-audit
-            p/owasp-top-ten
-            p/typescript
-            p/react
-            p/nodejsscan
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            -w /src \
+            returntocorp/semgrep:1.36.0 \
+            semgrep ci \
+              --config p/security-audit \
+              --config p/owasp-top-ten \
+              --config p/typescript \
+              --config p/react \
+              --config p/nodejsscan \
+              --skip-unknown-rule
 
   deploy:
     name: Deploy to Production VPS
