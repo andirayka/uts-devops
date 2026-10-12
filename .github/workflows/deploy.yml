@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Manual
+  workflow_dispatch:
 
 jobs:
   ci:
@@ -32,6 +32,16 @@ jobs:
       - name: Run Unit Tests
         run: npm test
 
+      - name: Run SAST Scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/typescript
+            p/react
+            p/nodejsscan
+
   deploy:
     name: Deploy to Production VPS
     needs: ci
@@ -48,13 +58,13 @@ jobs:
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
             set -e
-            echo "🚀 Entering project directory on VPS..."
+            echo "Entering project directory on VPS..."
             cd /root/uts-devops
 
-            echo "📥 Pulling latest changes from main branch..."
+            echo "Pulling latest changes from main branch..."
             git pull origin main
 
-            echo "🐳 Building and updating production containers..."
+            echo "Building and updating production containers..."
             docker compose -f docker-compose.prod.yml up --build -d
 
-            echo "🎉 Deployment successfully completed!"
+            echo "Deployment successfully completed!"
