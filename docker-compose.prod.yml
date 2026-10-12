@@ -22,6 +22,8 @@ services:
       - "${DB_PORT:-3306}:3306"
     volumes:
       - mysql_prod_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-classicmodels.sql:ro
+      - ./database/schema-users.sql:/docker-entrypoint-initdb.d/02-users.sql:ro
     command: --character-set-server=latin1 --collation-server=latin1_swedish_ci
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}" ]
@@ -44,6 +46,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATA_SOURCE: mysql
+      JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: mysql://${DB_USER:-root}:${DB_PASSWORD}@mysql:3306/${DB_NAME:-classicmodels}
       DB_HOST: mysql
       DB_PORT: 3306

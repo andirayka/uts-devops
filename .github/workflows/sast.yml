@@ -1,0 +1,67 @@
+name: SAST Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  semgrep:
+    name: Semgrep SAST Scan
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST
+        run: |
+          semgrep ci \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --config p/typescript \
+            --config p/react \
+            --config p/nodejsscan \
+            --json \
+            --output semgrep-results.json \
+            || true
+
+      - name: Upload SAST Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-sast-results
+          path: semgrep-results.json
+          retention-days: 30
+
+      - name: Generate SAST Summary
+        run: |
+          echo "## SAST Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f semgrep-results.json ]; then
+            TOTAL=$(cat semgrep-results.json | jq '.results | length')
+            CRITICAL=$(cat semgrep-results.json | jq '[.results[] | select(.extra.severity == "CRITICAL")] | length')
+            HIGH=$(cat semgrep-results.json | jq '[.results[] | select(.extra.severity == "HIGH")] | length')
+            MEDIUM=$(cat semgrep-results.json | jq '[.results[] | select(.extra.severity == "MEDIUM")] | length')
+            LOW=$(cat semgrep-results.json | jq '[.results[] | select(.extra.severity == "LOW")] | length')
+            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| CRITICAL | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| HIGH | $HIGH |" >> $GITHUB_STEP_SUMMARY
+            echo "| MEDIUM | $MEDIUM |" >> $GITHUB_STEP_SUMMARY
+            echo "| LOW | $LOW |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Total** | **$TOTAL** |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Detailed Findings</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat semgrep-results.json | jq '.results[] | {check_id, path, start: .start.line, severity: .extra.severity, message: .extra.message}' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No results file generated" >> $GITHUB_STEP_SUMMARY
+          fi
+        shell: bash
