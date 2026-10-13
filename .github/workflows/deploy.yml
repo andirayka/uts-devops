@@ -37,7 +37,7 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/src" \
             -w /src \
-            returntocorp/semgrep:1.55.0 \
+            returntocorp/semgrep:latest \
             semgrep scan \
               --config p/security-audit \
               --config p/owasp-top-ten \
