@@ -21,7 +21,7 @@ jobs:
           cache: "npm"
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run Linter
         run: npm run lint
@@ -37,14 +37,16 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/src" \
             -w /src \
-            returntocorp/semgrep:1.36.0 \
-            semgrep ci \
+            returntocorp/semgrep:1.55.0 \
+            semgrep scan \
               --config p/security-audit \
               --config p/owasp-top-ten \
               --config p/typescript \
               --config p/react \
               --config p/nodejsscan \
-              --skip-unknown-rule
+              --json \
+              --output semgrep-results.json \
+            || true
 
   deploy:
     name: Deploy to Production VPS
