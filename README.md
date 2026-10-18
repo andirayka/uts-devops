@@ -48,6 +48,7 @@ Mode production menggunakan [docker-compose.prod.yml](docker-compose.prod.yml) d
 - **cAdvisor**: Memantau konsumsi resource per-container Docker secara real-time (`:8080`).
 - **Prometheus**: Mengumpulkan metrik secara internal dari semua exporter. Port 9090 terisolasi di jaringan internal Docker demi keamanan.
 - **Grafana**: Visualisasi metrik terintegrasi langsung via subpath `/grafana/` dengan dashboard auto-provisioned.
+- **Loki & Fluent Bit**: Aggregator & log shipper tersentralisasi untuk mengumpulkan log container secara real-time.
 
 
 ### Langkah-langkah:

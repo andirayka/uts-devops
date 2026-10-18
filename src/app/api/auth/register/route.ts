@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createPool } from "mysql2/promise";
 import { hashPassword } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
+    logger.warn("Registration rejected: invalid JSON body", { action: "auth_register" });
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
@@ -41,6 +43,7 @@ export async function POST(request: Request) {
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
+    logger.error("Registration failed: DATABASE_URL not configured", undefined, { action: "auth_register" });
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
 
@@ -54,6 +57,13 @@ export async function POST(request: Request) {
     );
     const insertId = (result as { insertId: number }).insertId;
 
+    logger.info("New user registered successfully", {
+      action: "auth_register",
+      userId: insertId,
+      email,
+      name,
+    });
+
     return NextResponse.json(
       { user: { id: insertId, email, name, role: "user" } },
       { status: 201 },
@@ -61,11 +71,16 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const code = (error as { code?: string }).code;
     if (code === "ER_DUP_ENTRY") {
+      logger.warn("Registration rejected: email already registered", { action: "auth_register", email });
       return NextResponse.json(
         { error: "Email already registered" },
         { status: 409 },
       );
     }
+    logger.error("Registration encountered database/internal error", error, {
+      action: "auth_register",
+      email,
+    });
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   } finally {
     await pool.end();
