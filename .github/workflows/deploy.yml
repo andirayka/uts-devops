@@ -106,6 +106,9 @@ jobs:
             echo "Updating and starting production containers..."
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
+            echo "Applying idempotent DB schema updates..."
+            docker compose -f docker-compose.prod.yml exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' < database/schema-users.sql
+
             echo "Reloading services with updated configuration..."
             docker compose -f docker-compose.prod.yml restart grafana nginx fluent-bit
 
