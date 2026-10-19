@@ -52,6 +52,13 @@ jobs:
               --output semgrep-results.json \
             || true
 
+      - name: Upload SAST Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-results
+          path: semgrep-results.json
+          if-no-files-found: ignore
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
