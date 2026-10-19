@@ -6,11 +6,19 @@ import {
   CheckCircle2,
   CircleDollarSign,
   ClipboardList,
+  LogOut,
   RotateCcw,
   Search,
   ShoppingBag,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import { TOKEN_KEY, USER_KEY } from "@/lib/auth-storage";
 import {
   filterSales,
   formatSaleAmount,
@@ -51,6 +59,10 @@ type SalesLoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "success"; sales: Sale[]; source: SalesSource };
+
+function subscribeAuth() {
+  return () => {};
+}
 
 function formatDate(value: string, short = false) {
   const date = new Date(`${value}T00:00:00`);
@@ -479,6 +491,15 @@ export default function Home() {
   const [status, setStatus] = useState<SaleStatus | "all">("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const authorized = useSyncExternalStore(
+    subscribeAuth,
+    () => Boolean(localStorage.getItem(TOKEN_KEY)),
+    () => false,
+  );
+
+  useEffect(() => {
+    if (!authorized) window.location.replace("/login");
+  }, [authorized]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -560,6 +581,14 @@ export default function Home() {
     setTo("");
   }
 
+  function handleLogout() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    window.location.replace("/login");
+  }
+
+  if (!authorized) return null;
+
   return (
     <div className="min-h-screen bg-[#f5f8fc] text-slate-800">
       <header className="border-b border-slate-200/80 bg-white">
@@ -575,10 +604,20 @@ export default function Home() {
               <p className="text-[11px] text-slate-500">Ringkasan penjualan</p>
             </div>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-100 bg-blue-50/70 px-3 py-1.5 text-xs font-medium text-blue-800">
-            <span className="size-1.5 rounded-full bg-blue-500" aria-hidden="true" />
-            {sourceLabel}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50/70 px-3 py-1.5 text-xs font-medium text-blue-800">
+              <span className="size-1.5 rounded-full bg-blue-500" aria-hidden="true" />
+              {sourceLabel}
+            </span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+            >
+              <LogOut size={14} aria-hidden="true" />
+              Keluar
+            </button>
+          </div>
         </div>
       </header>
 
