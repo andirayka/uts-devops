@@ -858,7 +858,7 @@
             "uid": "Prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(container_cpu_usage_seconds_total{name=~\"axon.+\"}[1m]) * 100",
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"axon.+\", image!=\"\"}[1m])) * 100",
           "legendFormat": "{{name}} CPU",
           "range": true,
           "refId": "A"
@@ -913,7 +913,7 @@
             "uid": "Prometheus"
           },
           "editorMode": "code",
-          "expr": "container_memory_usage_bytes{name=~\"axon.+\"}",
+          "expr": "max by (name) (container_memory_working_set_bytes{name=~\"axon.+\", image!=\"\"})",
           "legendFormat": "{{name}} RAM",
           "range": true,
           "refId": "A"
@@ -921,6 +921,55 @@
       ],
       "title": "Container RAM Usage (cAdvisor)",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "id": 200,
+      "title": "Log Kontainer & Layanan (Loki)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 14,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "editorMode": "code",
+          "expr": "{job=\"axon\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Live Container Logs (App, Nginx, MySQL)",
+      "type": "logs"
     }
   ],
   "refresh": "5s",

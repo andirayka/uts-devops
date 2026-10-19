@@ -33,6 +33,7 @@ services:
       start_period: 30s
 
   app:
+    image: ghcr.io/andirayka/uts-devops/app:latest
     build:
       context: .
       dockerfile: Dockerfile.prod
@@ -96,6 +97,7 @@ services:
       - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
     depends_on:
       - prometheus
+      - loki
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -122,8 +124,36 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
 
+  loki:
+    image: grafana/loki:latest
+    container_name: axon-loki-prod
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_prod_data:/loki
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+
+  fluent-bit:
+    image: fluent/fluent-bit:latest
+    container_name: axon-fluent-bit-prod
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./monitoring/fluent-bit/docker-metadata.lua:/fluent-bit/etc/docker-metadata.lua:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    deploy:
+      resources:
+        limits:
+          memory: 30M
 
 volumes:
   mysql_prod_data:
   prometheus_prod_data:
   grafana_prod_data:
+  loki_prod_data:
