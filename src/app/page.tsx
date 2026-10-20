@@ -1,64 +1,34 @@
-"use client";
+'use client';
 
-import {
-  BarChart3,
-  CalendarDays,
-  CheckCircle2,
-  CircleDollarSign,
-  ClipboardList,
-  LogOut,
-  RotateCcw,
-  Search,
-  ShoppingBag,
-} from "lucide-react";
-import {
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
-import { TOKEN_KEY, USER_KEY } from "@/lib/auth-storage";
-import {
-  filterSales,
-  formatSaleAmount,
-  formatSalesAxisTick,
-  getDashboardSummary,
-  getSalesAxisMaximum,
-  getSalesSourcePresentation,
-  getSalesTrend,
-  type Sale,
-  type SaleStatus,
-  type SalesSource,
-} from "@/lib/dashboard-data";
+import { BarChart3, CalendarDays, CheckCircle2, CircleDollarSign, ClipboardList, LogOut, RotateCcw, Search, ShoppingBag } from 'lucide-react';
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { TOKEN_KEY, USER_KEY } from '@/lib/auth-storage';
+import { filterSales, formatSaleAmount, formatSalesAxisTick, getDashboardSummary, getSalesAxisMaximum, getSalesSourcePresentation, getSalesTrend, type Sale, type SaleStatus, type SalesSource } from '@/lib/dashboard-data';
 
-const dateFormatter = new Intl.DateTimeFormat("id-ID", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
+const dateFormatter = new Intl.DateTimeFormat('id-ID', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
 });
 
-const shortDateFormatter = new Intl.DateTimeFormat("id-ID", {
-  day: "2-digit",
-  month: "short",
+const shortDateFormatter = new Intl.DateTimeFormat('id-ID', {
+  day: '2-digit',
+  month: 'short',
 });
 
 const statusLabels: Record<SaleStatus, string> = {
-  completed: "Selesai",
-  processing: "Diproses",
-  cancelled: "Dibatalkan",
+  completed: 'Selesai',
+  processing: 'Diproses',
+  cancelled: 'Dibatalkan',
 };
 
 const statusStyles: Record<SaleStatus, string> = {
-  completed: "bg-emerald-50 text-emerald-700 ring-emerald-600/15",
-  processing: "bg-amber-50 text-amber-700 ring-amber-600/15",
-  cancelled: "bg-rose-50 text-rose-700 ring-rose-600/15",
+  completed: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
+  processing: 'bg-amber-50 text-amber-700 ring-amber-600/15',
+  cancelled: 'bg-rose-50 text-rose-700 ring-rose-600/15',
 };
 
-type SalesLoadState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "success"; sales: Sale[]; source: SalesSource };
+type SalesLoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'success'; sales: Sale[]; source: SalesSource };
 
 function subscribeAuth() {
   return () => {};
@@ -69,29 +39,15 @@ function formatDate(value: string, short = false) {
   return (short ? shortDateFormatter : dateFormatter).format(date);
 }
 
-function MetricCard({
-  title,
-  value,
-  description,
-  icon,
-}: {
-  title: string;
-  value: string;
-  description: string;
-  icon: ReactNode;
-}) {
+function MetricCard({ title, value, description, icon }: { title: string; value: string; description: string; icon: ReactNode }) {
   return (
     <article className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-500">{title}</p>
-          <p className="mt-3 truncate text-[1.55rem] font-semibold tracking-tight text-slate-900 sm:text-[1.7rem]">
-            {value}
-          </p>
+          <p className="mt-3 truncate text-[1.55rem] font-semibold tracking-tight text-slate-900 sm:text-[1.7rem]">{value}</p>
         </div>
-        <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700">
-          {icon}
-        </div>
+        <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700">{icon}</div>
       </div>
       <p className="mt-3 text-xs leading-5 text-slate-500">{description}</p>
     </article>
@@ -100,22 +56,14 @@ function MetricCard({
 
 function StatusPill({ status }: { status: SaleStatus }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${statusStyles[status]}`}
-    >
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${statusStyles[status]}`}>
       <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
       {statusLabels[status]}
     </span>
   );
 }
 
-function SalesChart({
-  sales,
-  source,
-}: {
-  sales: readonly Sale[];
-  source: SalesSource;
-}) {
+function SalesChart({ sales, source }: { sales: readonly Sale[]; source: SalesSource }) {
   const trend = useMemo(() => getSalesTrend(sales), [sales]);
   const maximumRevenue = Math.max(...trend.map((point) => point.revenue), 0);
   const axisMaximum = getSalesAxisMaximum(maximumRevenue, source);
@@ -123,30 +71,18 @@ function SalesChart({
   const presentation = getSalesSourcePresentation(source);
   const denseTrend = trend.length > 48;
   const labelInterval = Math.max(1, Math.ceil((trend.length - 1) / 7));
-  const visibleLabels = (index: number) =>
-    trend.length <= 8 ||
-    index === 0 ||
-    index === trend.length - 1 ||
-    index % labelInterval === 0;
+  const visibleLabels = (index: number) => trend.length <= 8 || index === 0 || index === trend.length - 1 || index % labelInterval === 0;
 
   return (
-    <section
-      id="grafik"
-      className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5"
-      aria-labelledby="chart-title"
-    >
+    <section id="grafik" className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5" aria-labelledby="chart-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="chart-title" className="text-base font-semibold text-slate-900">
             Tren penjualan
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Nilai transaksi hasil filter, tanpa dibatalkan, per tanggal
-          </p>
+          <p className="mt-1 text-xs text-slate-500">Nilai transaksi hasil filter, tanpa dibatalkan, per tanggal</p>
         </div>
-        <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-500">
-          {presentation.amountUnitLabel}
-        </span>
+        <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-500">{presentation.amountUnitLabel}</span>
       </div>
 
       {trend.length === 0 ? (
@@ -155,12 +91,8 @@ function SalesChart({
             <div className="mx-auto grid size-10 place-items-center rounded-full bg-white text-slate-400 shadow-sm">
               <BarChart3 size={19} aria-hidden="true" />
             </div>
-            <p className="mt-3 text-sm font-medium text-slate-700">
-              Belum ada data pada filter ini
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Ubah kata kunci, status, atau rentang tanggal.
-            </p>
+            <p className="mt-3 text-sm font-medium text-slate-700">Belum ada data pada filter ini</p>
+            <p className="mt-1 text-xs text-slate-500">Ubah kata kunci, status, atau rentang tanggal.</p>
           </div>
         </div>
       ) : (
@@ -169,21 +101,16 @@ function SalesChart({
             <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3">
               <div className="flex h-48 flex-col justify-between pb-1 text-right text-[10px] tabular-nums text-slate-400">
                 {axisTicks.map((tick, index) => (
-                  <span key={`${tick}-${index}`}>
-                    {tick === 0 ? "0" : formatSalesAxisTick(tick, source)}
-                  </span>
+                  <span key={`${tick}-${index}`}>{tick === 0 ? '0' : formatSalesAxisTick(tick, source)}</span>
                 ))}
               </div>
               <div className="relative h-48 border-b border-l border-slate-200 bg-[linear-gradient(to_bottom,#e8edf4_1px,transparent_1px)] [background-size:100%_33.333%]">
-                <div className={`absolute inset-0 flex items-stretch justify-between px-2 ${denseTrend ? "gap-0" : "gap-1.5 sm:gap-2"}`}>
+                <div className={`absolute inset-0 flex items-stretch justify-between px-2 ${denseTrend ? 'gap-0' : 'gap-1.5 sm:gap-2'}`}>
                   {trend.map((point) => {
                     const height = (point.revenue / axisMaximum) * 100;
                     const formattedDate = formatDate(point.date);
                     return (
-                      <div
-                        key={point.date}
-                        className="group relative flex h-full min-w-0 flex-1 items-end justify-center"
-                      >
+                      <div key={point.date} className="group relative flex h-full min-w-0 flex-1 items-end justify-center">
                         <div
                           className="w-full max-w-8 rounded-t-[4px] bg-blue-600 transition-colors group-hover:bg-blue-700"
                           style={{ height: `${height}%` }}
@@ -200,25 +127,20 @@ function SalesChart({
               <span aria-hidden="true" />
               <div className="relative h-5 text-[10px] text-slate-400">
                 <div className="absolute inset-x-2 top-0">
-                  {trend.map((point, index) => (
+                  {trend.map((point, index) =>
                     visibleLabels(index) ? (
                       <span
                         key={point.date}
                         className="absolute top-0 whitespace-nowrap"
                         style={{
                           left: `${trend.length === 1 ? 50 : (index / (trend.length - 1)) * 100}%`,
-                          transform:
-                            trend.length === 1 || (index !== 0 && index !== trend.length - 1)
-                              ? "translateX(-50%)"
-                              : index === 0
-                                ? "translateX(0)"
-                                : "translateX(-100%)",
+                          transform: trend.length === 1 || (index !== 0 && index !== trend.length - 1) ? 'translateX(-50%)' : index === 0 ? 'translateX(0)' : 'translateX(-100%)',
                         }}
                       >
                         {formatDate(point.date, true)}
                       </span>
-                    ) : null
-                  ))}
+                    ) : null,
+                  )}
                 </div>
               </div>
             </div>
@@ -231,52 +153,28 @@ function SalesChart({
 
 const PAGE_SIZE_OPTIONS = [10, 15, 20] as const;
 
-function PaginationControls({
-  page,
-  pageSize,
-  totalItems,
-  onPageChange,
-  onPageSizeChange,
-}: {
-  page: number;
-  pageSize: number;
-  totalItems: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: number) => void;
-}) {
+function PaginationControls({ page, pageSize, totalItems, onPageChange, onPageSizeChange }: { page: number; pageSize: number; totalItems: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const startItem = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
   const endItem = Math.min(page * pageSize, totalItems);
 
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
-  const visiblePages = pageNumbers.filter(
-    (n) => n === 1 || n === totalPages || Math.abs(n - page) <= 1,
-  );
+  const visiblePages = pageNumbers.filter((n) => n === 1 || n === totalPages || Math.abs(n - page) <= 1);
 
   const navButtonClass =
-    "inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600";
+    'inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600';
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
       <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onPageChange(1)}
-          disabled={page <= 1}
-          className={navButtonClass}
-        >
+        <button type="button" onClick={() => onPageChange(1)} disabled={page <= 1} className={navButtonClass}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="11 17 6 12 11 7" />
             <polyline points="18 17 13 12 18 7" />
           </svg>
           First
         </button>
-        <button
-          type="button"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-          className={navButtonClass}
-        >
+        <button type="button" onClick={() => onPageChange(page - 1)} disabled={page <= 1} className={navButtonClass}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -296,11 +194,9 @@ function PaginationControls({
                 <button
                   type="button"
                   onClick={() => onPageChange(n)}
-                  aria-current={n === page ? "page" : undefined}
+                  aria-current={n === page ? 'page' : undefined}
                   className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-xs font-medium transition ${
-                    n === page
-                      ? "bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-300"
-                      : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                    n === page ? 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-300' : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700'
                   }`}
                 >
                   {n}
@@ -309,23 +205,13 @@ function PaginationControls({
             );
           })}
         </div>
-        <button
-          type="button"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-          className={navButtonClass}
-        >
+        <button type="button" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className={navButtonClass}>
           Next
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
-        <button
-          type="button"
-          onClick={() => onPageChange(totalPages)}
-          disabled={page >= totalPages}
-          className={navButtonClass}
-        >
+        <button type="button" onClick={() => onPageChange(totalPages)} disabled={page >= totalPages} className={navButtonClass}>
           Last
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="13 17 18 12 13 7" />
@@ -356,42 +242,23 @@ function PaginationControls({
   );
 }
 
-function TransactionTable({
-  sales,
-  source,
-  onReset,
-  hasFilters,
-}: {
-  sales: readonly Sale[];
-  source: SalesSource;
-  onReset: () => void;
-  hasFilters: boolean;
-}) {
+function TransactionTable({ sales, source, onReset, hasFilters }: { sales: readonly Sale[]; source: SalesSource; onReset: () => void; hasFilters: boolean }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const presentation = getSalesSourcePresentation(source);
 
   const totalPages = Math.max(1, Math.ceil(sales.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const paginatedSales = useMemo(
-    () => sales.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [sales, currentPage, pageSize],
-  );
+  const paginatedSales = useMemo(() => sales.slice((currentPage - 1) * pageSize, currentPage * pageSize), [sales, currentPage, pageSize]);
 
   return (
-    <section
-      id="transaksi"
-      className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
-      aria-labelledby="transactions-title"
-    >
+    <section id="transaksi" className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]" aria-labelledby="transactions-title">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
         <div>
           <h2 id="transactions-title" className="text-base font-semibold text-slate-900">
             Daftar transaksi
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            {sales.length} transaksi sesuai filter
-          </p>
+          <p className="mt-1 text-xs text-slate-500">{sales.length} transaksi sesuai filter</p>
         </div>
         <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
           <ClipboardList size={15} aria-hidden="true" />
@@ -405,12 +272,8 @@ function TransactionTable({
             <div className="mx-auto grid size-11 place-items-center rounded-full bg-slate-100 text-slate-400">
               <Search size={19} aria-hidden="true" />
             </div>
-            <p className="mt-3 text-sm font-medium text-slate-700">
-              Tidak ada transaksi yang cocok
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Coba ubah filter atau tampilkan kembali semua data.
-            </p>
+            <p className="mt-3 text-sm font-medium text-slate-700">Tidak ada transaksi yang cocok</p>
+            <p className="mt-1 text-xs text-slate-500">Coba ubah filter atau tampilkan kembali semua data.</p>
             <button
               type="button"
               onClick={onReset}
@@ -427,41 +290,47 @@ function TransactionTable({
           <table className="w-full min-w-[980px] table-fixed text-left text-sm">
             <thead className="bg-slate-50/80 text-[11px] uppercase tracking-[0.06em] text-slate-500">
               <tr>
-                <th scope="col" className="w-32 px-5 py-3 font-semibold">ID transaksi</th>
-                <th scope="col" className="w-36 px-4 py-3 font-semibold">Tanggal</th>
-                <th scope="col" className="w-56 px-4 py-3 font-semibold">Pelanggan</th>
-                <th scope="col" className="w-[22%] px-4 py-3 font-semibold">Produk</th>
-                <th scope="col" className="w-36 px-4 py-3 font-semibold">{presentation.locationLabel}</th>
-                <th scope="col" className="w-32 px-4 py-3 font-semibold">Status</th>
-                <th scope="col" className="w-40 px-5 py-3 text-right font-semibold">{presentation.tableAmountLabel}</th>
+                <th scope="col" className="w-32 px-5 py-3 font-semibold">
+                  ID transaksi
+                </th>
+                <th scope="col" className="w-36 px-4 py-3 font-semibold">
+                  Tanggal
+                </th>
+                <th scope="col" className="w-56 px-4 py-3 font-semibold">
+                  Pelanggan
+                </th>
+                <th scope="col" className="w-[22%] px-4 py-3 font-semibold">
+                  Produk
+                </th>
+                <th scope="col" className="w-36 px-4 py-3 font-semibold">
+                  {presentation.locationLabel}
+                </th>
+                <th scope="col" className="w-32 px-4 py-3 font-semibold">
+                  Status
+                </th>
+                <th scope="col" className="w-40 px-5 py-3 text-right font-semibold">
+                  {presentation.tableAmountLabel}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedSales.map((sale) => (
                 <tr key={sale.id} className="transition-colors hover:bg-slate-50/70">
-                  <td className="whitespace-nowrap px-5 py-3.5 font-medium text-blue-700">
-                    {sale.id}
-                  </td>
+                  <td className="whitespace-nowrap px-5 py-3.5 font-medium text-blue-700">{sale.id}</td>
                   <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
                     <time dateTime={sale.date}>{formatDate(sale.date)}</time>
                   </td>
-                  <td className="truncate whitespace-nowrap px-4 py-3.5 font-medium text-slate-800">
-                    {sale.customer}
-                  </td>
+                  <td className="truncate whitespace-nowrap px-4 py-3.5 font-medium text-slate-800">{sale.customer}</td>
                   <td className="px-4 py-3.5 text-slate-600">
                     <span className="block truncate" title={sale.product}>
                       {sale.product}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
-                    {sale.channel}
-                  </td>
+                  <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">{sale.channel}</td>
                   <td className="whitespace-nowrap px-4 py-3.5">
                     <StatusPill status={sale.status} />
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-right font-semibold tabular-nums text-slate-800">
-                    {formatSaleAmount(sale.amount, source)}
-                  </td>
+                  <td className="whitespace-nowrap px-5 py-3.5 text-right font-semibold tabular-nums text-slate-800">{formatSaleAmount(sale.amount, source)}</td>
                 </tr>
               ))}
             </tbody>
@@ -485,12 +354,12 @@ function TransactionTable({
 }
 
 export default function Home() {
-  const [salesState, setSalesState] = useState<SalesLoadState>({ status: "loading" });
+  const [salesState, setSalesState] = useState<SalesLoadState>({ status: 'loading' });
   const [requestKey, setRequestKey] = useState(0);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<SaleStatus | "all">("all");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<SaleStatus | 'all'>('all');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const authorized = useSyncExternalStore(
     subscribeAuth,
     () => Boolean(localStorage.getItem(TOKEN_KEY)),
@@ -498,7 +367,7 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!authorized) window.location.replace("/login");
+    if (!authorized) window.location.replace('/login');
   }, [authorized]);
 
   useEffect(() => {
@@ -506,41 +375,31 @@ export default function Home() {
 
     async function loadSales() {
       try {
-        const response = await fetch("/api/sales", { signal: controller.signal });
+        const response = await fetch('/api/sales', { signal: controller.signal });
         const payload: unknown = await response.json();
         if (controller.signal.aborted) return;
 
         if (!response.ok) {
           const message =
-            typeof payload === "object" && payload !== null && "error" in payload &&
-            typeof payload.error === "string" && payload.error.trim().length > 0
-              ? payload.error
-              : "Data penjualan tidak dapat dimuat. Silakan coba lagi.";
-          setSalesState({ status: "error", message });
+            typeof payload === 'object' && payload !== null && 'error' in payload && typeof payload.error === 'string' && payload.error.trim().length > 0 ? payload.error : 'Data penjualan tidak dapat dimuat. Silakan coba lagi.';
+          setSalesState({ status: 'error', message });
           return;
         }
 
-        if (
-          typeof payload !== "object" ||
-          payload === null ||
-          !("sales" in payload) ||
-          !Array.isArray(payload.sales) ||
-          !("source" in payload) ||
-          (payload.source !== "demo" && payload.source !== "mysql")
-        ) {
-          throw new Error("Invalid sales response");
+        if (typeof payload !== 'object' || payload === null || !('sales' in payload) || !Array.isArray(payload.sales) || !('source' in payload) || (payload.source !== 'demo' && payload.source !== 'mysql')) {
+          throw new Error('Invalid sales response');
         }
 
         setSalesState({
-          status: "success",
+          status: 'success',
           sales: payload.sales as Sale[],
           source: payload.source,
         });
       } catch {
         if (controller.signal.aborted) return;
         setSalesState({
-          status: "error",
-          message: "Data penjualan tidak dapat dimuat. Silakan coba lagi.",
+          status: 'error',
+          message: 'Data penjualan tidak dapat dimuat. Silakan coba lagi.',
         });
       }
     }
@@ -549,42 +408,34 @@ export default function Home() {
     return () => controller.abort();
   }, [requestKey]);
 
-  const sales = useMemo(
-    () => (salesState.status === "success" ? salesState.sales : []),
-    [salesState],
-  );
-  const source = salesState.status === "success" ? salesState.source : null;
+  const sales = useMemo(() => (salesState.status === 'success' ? salesState.sales : []), [salesState]);
+  const source = salesState.status === 'success' ? salesState.source : null;
   const presentation = source ? getSalesSourcePresentation(source) : null;
-  const isLoading = salesState.status === "loading";
-  const loadError = salesState.status === "error" ? salesState.message : null;
+  const isLoading = salesState.status === 'loading';
+  const loadError = salesState.status === 'error' ? salesState.message : null;
 
-  const filteredSales = useMemo(
-    () => filterSales(sales, { query, status, from, to }),
-    [sales, query, status, from, to],
-  );
+  const filteredSales = useMemo(() => filterSales(sales, { query, status, from, to }), [sales, query, status, from, to]);
   const summary = useMemo(() => getDashboardSummary(filteredSales), [filteredSales]);
-  const hasFilters = Boolean(query.trim() || from || to || status !== "all");
+  const hasFilters = Boolean(query.trim() || from || to || status !== 'all');
   const invalidDateRange = Boolean(from && to && from > to);
   const dataDateRange = useMemo(() => {
     if (sales.length === 0) return null;
     const dates = sales.map((sale) => sale.date).sort();
     return { from: dates[0], to: dates[dates.length - 1] };
   }, [sales]);
-  const sourceLabel = isLoading
-    ? "Memuat data"
-    : presentation?.label ?? "Sumber tidak tersedia";
+  const sourceLabel = isLoading ? 'Memuat data' : (presentation?.label ?? 'Sumber tidak tersedia');
 
   function resetFilters() {
-    setQuery("");
-    setStatus("all");
-    setFrom("");
-    setTo("");
+    setQuery('');
+    setStatus('all');
+    setFrom('');
+    setTo('');
   }
 
   function handleLogout() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    window.location.replace("/login");
+    window.location.replace('/login');
   }
 
   if (!authorized) return null;
@@ -594,13 +445,11 @@ export default function Home() {
       <header className="border-b border-slate-200/80 bg-white">
         <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-blue-700 text-white shadow-sm shadow-blue-700/20">
+            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-red-700 text-white shadow-sm shadow-blue-700/20">
               <ShoppingBag size={18} strokeWidth={2.2} aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold tracking-tight text-slate-900">
-                Axon Sales
-              </p>
+              <p className="truncate text-sm font-bold tracking-tight text-slate-900">Axon Sales</p>
               <p className="text-[11px] text-slate-500">Ringkasan penjualan</p>
             </div>
           </div>
@@ -609,11 +458,7 @@ export default function Home() {
               <span className="size-1.5 rounded-full bg-blue-500" aria-hidden="true" />
               {sourceLabel}
             </span>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-            >
+            <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50">
               <LogOut size={14} aria-hidden="true" />
               Keluar
             </button>
@@ -624,47 +469,26 @@ export default function Home() {
       <main className="mx-auto max-w-[1440px] px-4 pb-10 pt-7 sm:px-6 sm:pt-9 lg:px-8">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
-              Dashboard
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-[1.75rem]">
-              Ringkasan penjualan
-            </h1>
-            <p className="mt-1.5 max-w-2xl text-sm text-slate-500">
-              Pantau transaksi dan nilai dari data yang terhubung. Semua angka mengikuti filter di bawah.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Dashboard</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-[1.75rem]">Ringkasan penjualan</h1>
+            <p className="mt-1.5 max-w-2xl text-sm text-slate-500">Pantau transaksi dan nilai dari data yang terhubung. Semua angka mengikuti filter di bawah.</p>
           </div>
           <span className="inline-flex items-center gap-2 pb-0.5 text-xs text-slate-500">
             <CalendarDays size={15} aria-hidden="true" />
-            {dataDateRange
-              ? `Rentang seluruh data: ${formatDate(dataDateRange.from)} – ${formatDate(dataDateRange.to)}`
-              : isLoading
-                ? "Memuat rentang data…"
-                : loadError
-                  ? "Rentang data tidak tersedia"
-                  : "Belum ada data transaksi"}
+            {dataDateRange ? `Rentang seluruh data: ${formatDate(dataDateRange.from)} – ${formatDate(dataDateRange.to)}` : isLoading ? 'Memuat rentang data…' : loadError ? 'Rentang data tidak tersedia' : 'Belum ada data transaksi'}
           </span>
         </div>
 
-        <section
-          className="mb-5 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5"
-          aria-label="Filter data penjualan"
-        >
+        <section className="mb-5 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5" aria-label="Filter data penjualan">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-slate-800">Filter data</h2>
-            <p className="text-xs text-slate-500">
-              Berlaku untuk ringkasan, grafik, dan transaksi
-            </p>
+            <p className="text-xs text-slate-500">Berlaku untuk ringkasan, grafik, dan transaksi</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.6fr)_minmax(150px,0.9fr)_minmax(145px,1fr)_minmax(145px,1fr)_auto]">
             <label className="block">
               <span className="mb-1.5 block text-xs font-medium text-slate-600">Cari transaksi</span>
               <span className="relative block">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  aria-hidden="true"
-                />
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                 <input
                   type="search"
                   value={query}
@@ -679,7 +503,7 @@ export default function Home() {
               <span className="mb-1.5 block text-xs font-medium text-slate-600">Status</span>
               <select
                 value={status}
-                onChange={(event) => setStatus(event.target.value as SaleStatus | "all")}
+                onChange={(event) => setStatus(event.target.value as SaleStatus | 'all')}
                 className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:border-slate-300 focus:border-blue-500 focus:outline-none"
               >
                 <option value="all">Semua status</option>
@@ -729,23 +553,16 @@ export default function Home() {
         </section>
 
         {isLoading ? (
-          <div
-            role="status"
-            aria-live="polite"
-            className="mb-5 rounded-xl border border-slate-200/80 bg-white px-4 py-10 text-center text-sm text-slate-500"
-          >
+          <div role="status" aria-live="polite" className="mb-5 rounded-xl border border-slate-200/80 bg-white px-4 py-10 text-center text-sm text-slate-500">
             Memuat data penjualan…
           </div>
         ) : loadError ? (
-          <div
-            role="alert"
-            className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-800"
-          >
+          <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-800">
             <p>{loadError}</p>
             <button
               type="button"
               onClick={() => {
-                setSalesState({ status: "loading" });
+                setSalesState({ status: 'loading' });
                 setRequestKey((key) => key + 1);
               }}
               className="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100"
@@ -757,47 +574,35 @@ export default function Home() {
           <>
             <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Metrik penjualan">
               <MetricCard
-                title={presentation?.revenueMetricTitle ?? "Nilai transaksi aktif"}
-                value={formatSaleAmount(summary.totalRevenue, source ?? "demo")}
+                title={presentation?.revenueMetricTitle ?? 'Nilai transaksi aktif'}
+                value={formatSaleAmount(summary.totalRevenue, source ?? 'demo')}
                 description="Nilai transaksi hasil filter, tanpa dibatalkan"
                 icon={<CircleDollarSign size={20} aria-hidden="true" />}
               />
+              <MetricCard title="Jumlah transaksi" value={summary.transactionCount.toLocaleString('id-ID')} description="Seluruh transaksi hasil filter" icon={<ClipboardList size={20} aria-hidden="true" />} />
               <MetricCard
-                title="Jumlah transaksi"
-                value={summary.transactionCount.toLocaleString("id-ID")}
-                description="Seluruh transaksi hasil filter"
-                icon={<ClipboardList size={20} aria-hidden="true" />}
-              />
-              <MetricCard
-                title={presentation?.averageMetricTitle ?? "Rata-rata nilai aktif"}
-                value={formatSaleAmount(summary.averageOrderValue, source ?? "demo")}
+                title={presentation?.averageMetricTitle ?? 'Rata-rata nilai aktif'}
+                value={formatSaleAmount(summary.averageOrderValue, source ?? 'demo')}
                 description="Nilai transaksi aktif ÷ pesanan aktif"
                 icon={<ShoppingBag size={20} aria-hidden="true" />}
               />
               <MetricCard
                 title="Tingkat penyelesaian"
-                value={new Intl.NumberFormat("id-ID", { style: "percent", maximumFractionDigits: 0 }).format(summary.completionRate)}
+                value={new Intl.NumberFormat('id-ID', { style: 'percent', maximumFractionDigits: 0 }).format(summary.completionRate)}
                 description={`${summary.completedCount} selesai dari ${summary.activeTransactionCount} pesanan aktif`}
                 icon={<CheckCircle2 size={20} aria-hidden="true" />}
               />
             </section>
 
             <div className="mb-5">
-              <SalesChart sales={filteredSales} source={source ?? "demo"} />
+              <SalesChart sales={filteredSales} source={source ?? 'demo'} />
             </div>
 
-            <TransactionTable
-              sales={filteredSales}
-              source={source ?? "demo"}
-              onReset={resetFilters}
-              hasFilters={hasFilters}
-            />
+            <TransactionTable sales={filteredSales} source={source ?? 'demo'} onReset={resetFilters} hasFilters={hasFilters} />
           </>
         )}
 
-        <footer className="mt-5 text-center text-xs text-slate-400">
-          {presentation?.footerLabel ?? "Dashboard Axon Sales"}
-        </footer>
+        <footer className="mt-5 text-center text-xs text-slate-400">{presentation?.footerLabel ?? 'Dashboard Axon Sales'}</footer>
       </main>
     </div>
   );
